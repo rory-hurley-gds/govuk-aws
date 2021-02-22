@@ -188,42 +188,6 @@ resource "aws_route53_record" "memcached_cname" {
   records = ["${aws_elasticache_cluster.memcached.cluster_address}"]
 }
 
-module "mapit-1" {
-  lc_create_ebs_volume          = "${var.lc_create_ebs_volume}"
-  source                        = "../../modules/aws/node_group"
-  name                          = "${var.stackname}-mapit-1"
-  default_tags                  = "${map("Project", var.stackname, "aws_stackname", var.stackname, "aws_environment", var.aws_environment, "aws_migration", "mapit", "aws_hostname", "mapit-1")}"
-  instance_subnet_ids           = "${matchkeys(values(data.terraform_remote_state.infra_networking.private_subnet_names_ids_map), keys(data.terraform_remote_state.infra_networking.private_subnet_names_ids_map), list(var.mapit_subnet_a))}"
-  instance_security_group_ids   = ["${data.terraform_remote_state.infra_security_groups.sg_mapit_id}", "${data.terraform_remote_state.infra_security_groups.sg_management_id}"]
-  instance_type                 = "${var.instance_type}"
-  instance_additional_user_data = "${join("\n", null_resource.user_data.*.triggers.snippet)}"
-  instance_elb_ids_length       = "1"
-  instance_elb_ids              = ["${aws_elb.mapit_elb.id}"]
-  instance_ami_filter_name      = "${var.instance_ami_filter_name}"
-  asg_notification_topic_arn    = "${data.terraform_remote_state.infra_monitoring.sns_topic_autoscaling_group_events_arn}"
-  root_block_device_volume_size = "20"
-  ebs_device_volume_size        = "${var.ebs_device_volume_size}"
-  ebs_encrypted                 = "${var.ebs_encrypted}"
-  ebs_device_name               = "${var.ebs_device_name}"
-}
-
-resource "aws_ebs_volume" "mapit-1" {
-  availability_zone = "${lookup(data.terraform_remote_state.infra_networking.private_subnet_names_azs_map, var.mapit_subnet_a)}"
-  encrypted         = "${var.ebs_encrypted}"
-  size              = 20
-  type              = "gp2"
-
-  tags {
-    Name            = "${var.stackname}-mapit"
-    Project         = "${var.stackname}"
-    Device          = "xvdf"
-    aws_hostname    = "mapit-1"
-    aws_migration   = "mapit"
-    aws_stackname   = "${var.stackname}"
-    aws_environment = "${var.aws_environment}"
-  }
-}
-
 module "mapit-2" {
   lc_create_ebs_volume          = "${var.lc_create_ebs_volume}"
   source                        = "../../modules/aws/node_group"
@@ -336,11 +300,6 @@ resource "aws_iam_policy" "mapit_iam_policy" {
   name   = "${var.stackname}-mapit-additional"
   path   = "/"
   policy = "${file("${path.module}/additional_policy.json")}"
-}
-
-resource "aws_iam_role_policy_attachment" "mapit_1_iam_role_policy_attachment" {
-  role       = "${module.mapit-1.instance_iam_role_name}"
-  policy_arn = "${aws_iam_policy.mapit_iam_policy.arn}"
 }
 
 resource "aws_iam_role_policy_attachment" "mapit_2_iam_role_policy_attachment" {
