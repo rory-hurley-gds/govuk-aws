@@ -18,53 +18,37 @@ def lambda_handler(event, context):
     )
     lastWrittenTime = 0
     lastWrittenThisRun = 0
-    firstRun = False
+    writes = 0
     logFileData = ""
 
     try:
         S3client.head_bucket(Bucket=S3BucketName)
     except botocore.exceptions.ClientError as e:
-        error_code = int(e.response["ResponseMetadata"]["HTTPStatusCode"])
-        if error_code == 404:
-            raise Exception("Error: Bucket name provided not found")
-        else:
-            raise Exception(
-                "Error: Unable to access bucket name, error: "
-                + e.response["Error"]["Message"]
-            )
+        raise Exception(f"Unable to access bucket {S3BucketName}: {e}")
 
     try:
         lrfHandle = S3client.get_object(Bucket=S3BucketName, Key=lastReceivedFile)
-    except botocore.exceptions.ClientError as e:
-        error_code = int(e.response["ResponseMetadata"]["HTTPStatusCode"])
-        if error_code == 404:
-            print(
-                "It appears this is the first log import, so all files will be retrieved from RDS."
-            )
-            firstRun = True
-        else:
-            raise Exception(
-                "Error: Unable to access lastReceivedFile name, error: "
-                + e.response["Error"]["Message"]
-            )
-
-    if not firstRun:
         lastWrittenTime = int(lrfHandle["Body"].read())
-        if lastWrittenTime == 0:
-            raise Exception("Error: Existing lastWrittenTime is " + lastWrittenTime)
         print(
-            "Found marker from last log download, retrieving log files with lastWritten time after %s"
-            % str(lastWrittenTime)
+            f"Found {lastReceivedFile} from last log download; "
+            f"retrieving log files with lastWritten time after {lastWrittenTime}"
         )
-
-    writes = 0
-    hasRun = False
+    except botocore.exceptions.ClientError as e:
+        errorCode = int(e.response["ResponseMetadata"]["HTTPStatusCode"])
+        if errorCode == 404:
+            print(
+                f"{lastReceivedFile} not found; seems this is the first run. "
+                "All files will be retrieved from RDS."
+            )
+            lastWrittenTime = 0
+        else:
+            raise Exception(f"Unable to access {lastReceivedFile}: {e}")
 
     for dbLog in dbLogs["DescribeDBLogFiles"]:
-        if (int(dbLog["LastWritten"]) > lastWrittenTime) or firstRun:
+        if int(dbLog["LastWritten"]) > lastWrittenTime:
             print(
-                "Downloading DB log file: %s found with LastWritten value of: %s "
-                % (dbLog["LogFileName"], dbLog["LastWritten"])
+                f"Downloading DB log file {dbLog['LogFileName']} "
+                f"(LastWritten={dbLog['LastWritten']})"
             )
 
             if int(dbLog["LastWritten"]) > lastWrittenThisRun:
@@ -88,45 +72,29 @@ def lambda_handler(event, context):
 
             try:
                 objectName = S3BucketPrefix + dbLog["LogFileName"]
-                print(
-                    "Attempting to write log file %s to S3 bucket %s"
-                    % (objectName, S3BucketName)
-                )
+                print(f"Attempting to write log file {objectName} to S3 bucket {S3BucketName}")
                 S3client.put_object(Bucket=S3BucketName, Key=objectName, Body=byteData)
+                writes += 1
+                print(f"Successfully wrote log file {objectName} to S3 bucket {S3BucketName}")
             except botocore.exceptions.ClientError as e:
-                raise Exception(
-                    "Error writing log file to S3 bucket, S3 ClientError: "
-                    + e.response["Error"]["Message"]
-                )
+                raise Exception(f"Error writing log file to S3 bucket, S3 ClientError: {e}")
 
-            hasRun = True
-            writes += 1
-            print(
-                "Successfully wrote log file %s to S3 bucket %s"
-                % (objectName, S3BucketName)
-            )
-
-    # Otherwise, leave it alone
-    if hasRun:
+    print("------------ Writing of files to S3 complete:")
+    if writes:
+        print(f"Successfully wrote {writes} log files.")
         try:
             S3client.put_object(
                 Bucket=S3BucketName,
                 Key=lastReceivedFile,
                 Body=str.encode(str(lastWrittenThisRun)),
             )
-        except botocore.exceptions.ClientError as e:
-            raise Exception(
-                "Error writing marker to S3 bucket, S3 ClientError: "
-                + e.response["Error"]["Message"]
+            print(
+                "Successfully wrote new last-written marker to "
+                f"s3://{S3BucketName}/{lastReceivedFile}"
             )
+        except botocore.exceptions.ClientError as e:
+            raise Exception(f"Error writing marker to S3 bucket, S3 ClientError: {e}")
     else:
-        print("No new log files were written during this execution.")
-
-    print("------------ Writing of files to S3 complete:")
-    print("Successfully wrote %s log files." % (writes))
-    print(
-        "Successfully wrote new Last Written Marker to %s in Bucket %s"
-        % (lastReceivedFile, S3BucketName)
-    )
+        print("No new log files were written.")
 
     return "Log file export complete."
