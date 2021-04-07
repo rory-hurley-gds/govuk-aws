@@ -1,8 +1,6 @@
 import boto3
 import botocore
-import json
 import os
-from StringIO import StringIO
 
 
 def lambda_handler(event, context):
