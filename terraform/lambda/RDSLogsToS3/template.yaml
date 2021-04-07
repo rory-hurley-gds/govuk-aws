@@ -7,12 +7,13 @@ Resources:
   RDSLogsToS3:
     Type: AWS::Serverless::Function
     Properties:
-      Runtime: python2.7
+      Runtime: python3.8
+      Timeout: 60
       Handler: main.lambda_handler
       Environment:
         Variables:
-          RDS_INSTANCE_NAME:
-          S3_BUCKET_NAME:
-          S3_BUCKET_PREFIX:
+          RDS_INSTANCE_NAME: blue-transition-postgresql-standby
+          S3_BUCKET_NAME: govuk-integration-aws-logging
+          S3_BUCKET_PREFIX: rds/blue-transition-postgresql-standby/
           LAST_RECEIVED_FILE: last_received.log
           LOG_NAME_PREFIX: error/
