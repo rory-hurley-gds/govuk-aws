@@ -4,78 +4,78 @@ import os
 
 
 def lambda_handler(event, context):
-    RDSInstanceName = os.environ["RDS_INSTANCE_NAME"]
-    S3BucketName = os.environ["S3_BUCKET_NAME"]
-    S3BucketPrefix = os.environ["S3_BUCKET_PREFIX"]
-    logNamePrefix = os.environ["LOG_NAME_PREFIX"]
-    lastReceivedFile = S3BucketPrefix + os.environ["LAST_RECEIVED_FILE"]
+    rds_instance_name = os.environ["RDS_INSTANCE_NAME"]
+    s3_bucket_name = os.environ["S3_BUCKET_NAME"]
+    s3_prefix = os.environ["S3_BUCKET_PREFIX"]
+    log_name_prefix = os.environ["LOG_NAME_PREFIX"]
+    last_received_file = s3_prefix + os.environ["LAST_RECEIVED_FILE"]
     region = event["region"]
 
-    S3client = boto3.client("s3", region_name=region)
-    RDSclient = boto3.client("rds", region_name=region)
-    dbLogs = RDSclient.describe_db_log_files(
-        DBInstanceIdentifier=RDSInstanceName, FilenameContains=logNamePrefix
+    s3_client = boto3.client("s3", region_name=region)
+    rds_client = boto3.client("rds", region_name=region)
+    db_logs = rds_client.describe_db_log_files(
+        DBInstanceIdentifier=rds_instance_name, FilenameContains=log_name_prefix
     )
-    lastWrittenTime = 0
-    lastWrittenThisRun = 0
+    time_copied_up_to = 0
+    time_copied_up_to_this_run = 0
     writes = 0
-    logFileData = ""
+    log_file_data = ""
 
     try:
-        S3client.head_bucket(Bucket=S3BucketName)
+        s3_client.head_bucket(Bucket=s3_bucket_name)
     except botocore.exceptions.ClientError as e:
-        raise Exception(f"Unable to access bucket {S3BucketName}: {e}")
+        raise Exception(f"Unable to access bucket {s3_bucket_name}: {e}")
 
     try:
-        lrfHandle = S3client.get_object(Bucket=S3BucketName, Key=lastReceivedFile)
-        lastWrittenTime = int(lrfHandle["Body"].read())
+        lrf = s3_client.get_object(Bucket=s3_bucket_name, Key=last_received_file)
+        time_copied_up_to = int(lrf["Body"].read())
         print(
-            f"Found {lastReceivedFile} from last log download; "
-            f"retrieving log files with lastWritten time after {lastWrittenTime}"
+            f"Found {last_received_file} from last log download; "
+            f"retrieving log files with LastWritten time after {time_copied_up_to}"
         )
     except botocore.exceptions.ClientError as e:
-        errorCode = int(e.response["ResponseMetadata"]["HTTPStatusCode"])
-        if errorCode == 404:
+        error_code = int(e.response["ResponseMetadata"]["HTTPStatusCode"])
+        if error_code == 404:
             print(
-                f"{lastReceivedFile} not found; seems this is the first run. "
+                f"{last_received_file} not found; seems this is the first run. "
                 "All files will be retrieved from RDS."
             )
-            lastWrittenTime = 0
+            time_copied_up_to = 0
         else:
-            raise Exception(f"Unable to access {lastReceivedFile}: {e}")
+            raise Exception(f"Unable to access {last_received_file}: {e}")
 
-    for dbLog in dbLogs["DescribeDBLogFiles"]:
-        if int(dbLog["LastWritten"]) > lastWrittenTime:
+    for db_log in db_logs["DescribeDBLogFiles"]:
+        if int(db_log["LastWritten"]) > time_copied_up_to:
             print(
-                f"Downloading DB log file {dbLog['LogFileName']} "
-                f"(LastWritten={dbLog['LastWritten']})"
+                f"Downloading DB log file {db_log['LogFileName']} "
+                f"(LastWritten={db_log['LastWritten']})"
             )
 
-            if int(dbLog["LastWritten"]) > lastWrittenThisRun:
-                lastWrittenThisRun = int(dbLog["LastWritten"])
+            if int(db_log["LastWritten"]) > time_copied_up_to_this_run:
+                time_copied_up_to_this_run = int(db_log["LastWritten"])
 
-            logFile = RDSclient.download_db_log_file_portion(
-                DBInstanceIdentifier=RDSInstanceName,
-                LogFileName=dbLog["LogFileName"],
+            log_file = rds_client.download_db_log_file_portion(
+                DBInstanceIdentifier=rds_instance_name,
+                LogFileName=db_log["LogFileName"],
                 Marker="0",
             )
-            logFileData = logFile["LogFileData"]
+            log_file_data = log_file["LogFileData"]
 
-            while logFile["AdditionalDataPending"]:
-                logFile = RDSclient.download_db_log_file_portion(
-                    DBInstanceIdentifier=RDSInstanceName,
-                    LogFileName=dbLog["LogFileName"],
-                    Marker=logFile["Marker"],
+            while log_file["AdditionalDataPending"]:
+                log_file = rds_client.download_db_log_file_portion(
+                    DBInstanceIdentifier=rds_instance_name,
+                    LogFileName=db_log["LogFileName"],
+                    Marker=log_file["Marker"],
                 )
-                logFileData += logFile["LogFileData"]
-            byteData = str.encode(logFileData)
+                log_file_data += log_file["LogFileData"]
+            byte_data = str.encode(log_file_data)
 
             try:
-                objectName = S3BucketPrefix + dbLog["LogFileName"]
-                print(f"Attempting to write log file {objectName} to S3 bucket {S3BucketName}")
-                S3client.put_object(Bucket=S3BucketName, Key=objectName, Body=byteData)
+                obj_name = s3_prefix + db_log["LogFileName"]
+                print(f"Attempting to write log file {obj_name} to S3 bucket {s3_bucket_name}")
+                s3_client.put_object(Bucket=s3_bucket_name, Key=obj_name, Body=byte_data)
                 writes += 1
-                print(f"Successfully wrote log file {objectName} to S3 bucket {S3BucketName}")
+                print(f"Successfully wrote log file {obj_name} to S3 bucket {s3_bucket_name}")
             except botocore.exceptions.ClientError as e:
                 raise Exception(f"Error writing log file to S3 bucket, S3 ClientError: {e}")
 
@@ -83,14 +83,14 @@ def lambda_handler(event, context):
     if writes:
         print(f"Successfully wrote {writes} log files.")
         try:
-            S3client.put_object(
-                Bucket=S3BucketName,
-                Key=lastReceivedFile,
-                Body=str.encode(str(lastWrittenThisRun)),
+            s3_client.put_object(
+                Bucket=s3_bucket_name,
+                Key=last_received_file,
+                Body=str.encode(str(time_copied_up_to_this_run)),
             )
             print(
                 "Successfully wrote new last-written marker to "
-                f"s3://{S3BucketName}/{lastReceivedFile}"
+                f"s3://{s3_bucket_name}/{last_received_file}"
             )
         except botocore.exceptions.ClientError as e:
             raise Exception(f"Error writing marker to S3 bucket, S3 ClientError: {e}")
