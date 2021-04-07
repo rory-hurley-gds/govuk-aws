@@ -4,7 +4,6 @@ import os
 
 
 def lambda_handler(event, context):
-
     RDSInstanceName = os.environ["RDS_INSTANCE_NAME"]
     S3BucketName = os.environ["S3_BUCKET_NAME"]
     S3BucketPrefix = os.environ["S3_BUCKET_PREFIX"]
@@ -49,9 +48,9 @@ def lambda_handler(event, context):
                 + e.response["Error"]["Message"]
             )
 
-    if firstRun == False:
+    if not firstRun:
         lastWrittenTime = int(lrfHandle["Body"].read())
-        if lastWrittenTime == 0 or lastWrittenTime == None:
+        if lastWrittenTime == 0:
             raise Exception("Error: Existing lastWrittenTime is " + lastWrittenTime)
         print(
             "Found marker from last log download, retrieving log files with lastWritten time after %s"
@@ -108,7 +107,7 @@ def lambda_handler(event, context):
             )
 
     # Otherwise, leave it alone
-    if hasRun == True:
+    if hasRun:
         try:
             S3client.put_object(
                 Bucket=S3BucketName,
