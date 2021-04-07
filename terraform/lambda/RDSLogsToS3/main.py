@@ -1,5 +1,6 @@
 import boto3
 import botocore
+import io
 import os
 
 
@@ -19,7 +20,6 @@ def lambda_handler(event, context):
     time_copied_up_to = 0
     time_copied_up_to_this_run = 0
     writes = 0
-    log_file_data = ""
 
     try:
         s3_client.head_bucket(Bucket=s3_bucket_name)
@@ -59,25 +59,22 @@ def lambda_handler(event, context):
                 LogFileName=db_log["LogFileName"],
                 Marker="0",
             )
-            log_file_data = log_file["LogFileData"]
-
+            log_file_data = io.BytesIO(log_file["LogFileData"].encode())
             while log_file["AdditionalDataPending"]:
                 log_file = rds_client.download_db_log_file_portion(
                     DBInstanceIdentifier=rds_instance_name,
                     LogFileName=db_log["LogFileName"],
                     Marker=log_file["Marker"],
                 )
-                log_file_data += log_file["LogFileData"]
-            byte_data = str.encode(log_file_data)
+                log_file_data.write(log_file["LogFileData"].encode())
 
             try:
                 obj_name = s3_prefix + db_log["LogFileName"]
-                print(f"Attempting to write log file {obj_name} to S3 bucket {s3_bucket_name}")
-                s3_client.put_object(Bucket=s3_bucket_name, Key=obj_name, Body=byte_data)
+                print(f"Writing s3://{s3_bucket_name}/{obj_name}")
+                s3_client.put_object(Bucket=s3_bucket_name, Key=obj_name, Body=log_file_data)
                 writes += 1
-                print(f"Successfully wrote log file {obj_name} to S3 bucket {s3_bucket_name}")
             except botocore.exceptions.ClientError as e:
-                raise Exception(f"Error writing log file to S3 bucket, S3 ClientError: {e}")
+                raise Exception(f"Error writing to s3://{s3_bucket_name}/{obj_name}: {e}")
 
     print("------------ Writing of files to S3 complete:")
     if writes:
