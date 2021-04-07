@@ -64,8 +64,8 @@ resource "aws_lambda_function" "lambda_rds_logs_to_s3" {
   function_name = "RDSLogsToS3-${var.rds_instance_id}"
   role          = "${var.lambda_role_arn}"
   handler       = "main.lambda_handler"
-  runtime       = "python2.7"
-  timeout       = "60"
+  runtime       = "python3.8"
+  timeout       = "300"
 
   environment {
     variables = {
