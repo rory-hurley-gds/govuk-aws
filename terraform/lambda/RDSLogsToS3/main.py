@@ -1,3 +1,12 @@
+"""Lambda to copy log files from RDS to S3.
+
+The copy is incremental, based on recording the timestamp of the latest log
+copied at the end of each run (stored as an integer in
+s3://$S3_BUCKET_NAME/$LOG_NAME_PREFIX/$LAST_RECEIVED_FILE).
+
+Loosely based on https://github.com/vcardillo/rdslogs_to_s3
+"""
+
 import boto3
 import botocore
 import io
