@@ -2,6 +2,7 @@ import boto3
 import botocore
 import io
 import os
+import posixpath
 
 
 def lambda_handler(event, context):
@@ -9,7 +10,7 @@ def lambda_handler(event, context):
     s3_bucket_name = os.environ["S3_BUCKET_NAME"]
     s3_prefix = os.environ["S3_BUCKET_PREFIX"]
     log_name_prefix = os.environ["LOG_NAME_PREFIX"]
-    last_received_file = s3_prefix + os.environ["LAST_RECEIVED_FILE"]
+    last_received_file = posixpath.join(s3_prefix, os.environ["LAST_RECEIVED_FILE"])
     region = event["region"]
 
     s3_client = boto3.client("s3", region_name=region)
@@ -30,7 +31,7 @@ def lambda_handler(event, context):
         lrf = s3_client.get_object(Bucket=s3_bucket_name, Key=last_received_file)
         time_copied_up_to = int(lrf["Body"].read())
         print(
-            f"Found {last_received_file} from last log download; "
+            f"Found s3://{s3_bucket_name}/{last_received_file} from previous run; "
             f"retrieving log files with LastWritten time after {time_copied_up_to}"
         )
     except botocore.exceptions.ClientError as e:
@@ -69,7 +70,7 @@ def lambda_handler(event, context):
                 log_file_data.write(log_file["LogFileData"].encode())
 
             try:
-                obj_name = s3_prefix + db_log["LogFileName"]
+                obj_name = posixpath.join(s3_prefix, db_log["LogFileName"])
                 print(f"Writing s3://{s3_bucket_name}/{obj_name}")
                 s3_client.put_object(Bucket=s3_bucket_name, Key=obj_name, Body=log_file_data)
                 writes += 1
@@ -83,7 +84,7 @@ def lambda_handler(event, context):
             s3_client.put_object(
                 Bucket=s3_bucket_name,
                 Key=last_received_file,
-                Body=str.encode(str(time_copied_up_to_this_run)),
+                Body=str(time_copied_up_to_this_run).encode(),
             )
             print(
                 "Successfully wrote new last-written marker to "
