@@ -17,7 +17,7 @@ def lambda_handler(event, context):
         DBInstanceIdentifier=RDSInstanceName, FilenameContains=logNamePrefix
     )
     lastWrittenTime = 0
-    lastWrittenThisRun = None
+    lastWrittenThisRun = 0
     firstRun = False
     logFileData = ""
 
