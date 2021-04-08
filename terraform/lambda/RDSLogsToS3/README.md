@@ -5,7 +5,7 @@ based on https://github.com/vcardillo/rdslogs_to_s3
 
 It is triggered by a CloudWatch scheduled event.
 
-### Testing locally
+### Running locally
 
 1. Install [AWS sam-local](https://github.com/awslabs/aws-sam-local):
 
@@ -26,3 +26,9 @@ It is triggered by a CloudWatch scheduled event.
 4. Test the Lambda function:
 
         sam local invoke RDSLogsToS3 -e event.json
+
+### Running tests
+
+There are a couple of automated tests. These use [LocalStack](https://github.com/localstack/localstack).
+
+Run `make testenv` to install the prerequisites, then `make test` to run the tests. (The makefile probably only works smoothly on macOS at the time of writing).
