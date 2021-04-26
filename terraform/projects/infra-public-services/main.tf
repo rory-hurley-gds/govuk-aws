@@ -601,10 +601,44 @@ resource "aws_wafregional_web_acl_association" "backend_public_lb" {
   web_acl_id   = "${aws_wafregional_web_acl.default.id}"
 }
 
+locals {
+  backend_restricted_paths = {
+    "signon" = ["/api/*"]
+  }
+}
+
+resource "aws_lb_listener_rule" "backend_alb_restricted_paths" {
+  count        = "${length(local.backend_restricted_paths)}"
+  listener_arn = "${element(module.backend_public_lb.load_balancer_ssl_listeners, 0)}"
+  priority     = "${count.index + 1}"
+
+  action {
+    type = "fixed-response"
+
+    fixed_response {
+      content_type = "text/plain"
+      message_body = "Forbidden"
+      status_code  = "403"
+    }
+  }
+
+  condition {
+    host_header {
+      values = ["${element(keys(local.backend_restricted_paths), count.index)}.*"]
+    }
+  }
+
+  condition {
+    path_pattern {
+      values = ["${local.backend_restricted_paths["${element(keys(local.backend_restricted_paths), count.index)}"]}"]
+    }
+  }
+}
+
 resource "aws_lb_listener_rule" "backend_alb_blocked_host_headers" {
   count        = "${length(var.backend_alb_blocked_host_headers)}"
   listener_arn = "${element(module.backend_public_lb.load_balancer_ssl_listeners, 0)}"
-  priority     = "${count.index + 1}"
+  priority     = "${count.index + length(local.backend_restricted_paths) + 1}"
 
   action {
     type             = "fixed-response"
@@ -631,7 +665,7 @@ module "backend_public_lb_rules" {
   listener_arn                     = "${module.backend_public_lb.load_balancer_ssl_listeners[0]}"
   rules_host                       = ["${compact(split(",", var.enable_lb_app_healthchecks ? join(",", var.backend_public_service_cnames) : ""))}"]
   rules_for_existing_target_groups = "${var.backend_rules_for_existing_target_groups}"
-  priority_offset                  = "${length(var.backend_alb_blocked_host_headers) + 1}"
+  priority_offset                  = "${length(local.backend_restricted_paths) + length(var.backend_alb_blocked_host_headers) + 1}"
   default_tags                     = "${map("Project", var.stackname, "aws_migration", "backend", "aws_environment", var.aws_environment)}"
 }
 

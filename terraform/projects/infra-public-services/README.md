@@ -85,6 +85,7 @@ This project adds global resources for app components:
 | [aws_lb_listener.licensify_backend_http_80](https://registry.terraform.io/providers/hashicorp/aws/2.46.0/docs/resources/lb_listener) | resource |
 | [aws_lb_listener.licensify_frontend_public_http_80](https://registry.terraform.io/providers/hashicorp/aws/2.46.0/docs/resources/lb_listener) | resource |
 | [aws_lb_listener_rule.backend_alb_blocked_host_headers](https://registry.terraform.io/providers/hashicorp/aws/2.46.0/docs/resources/lb_listener_rule) | resource |
+| [aws_lb_listener_rule.backend_alb_restricted_paths](https://registry.terraform.io/providers/hashicorp/aws/2.46.0/docs/resources/lb_listener_rule) | resource |
 | [aws_route53_record.account_internal_service_cnames](https://registry.terraform.io/providers/hashicorp/aws/2.46.0/docs/resources/route53_record) | resource |
 | [aws_route53_record.account_internal_service_names](https://registry.terraform.io/providers/hashicorp/aws/2.46.0/docs/resources/route53_record) | resource |
 | [aws_route53_record.apt_internal_service_names](https://registry.terraform.io/providers/hashicorp/aws/2.46.0/docs/resources/route53_record) | resource |
