@@ -1,3 +1,0 @@
-bucket  = "govuk-terraform-steppingstone-staging"
-project = "govuk-staging-160211"
-prefix  = "govuk/infra-google-monitoring"

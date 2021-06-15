@@ -309,22 +309,6 @@ data "template_file" "s3_govuk_mirror_read_policy_template" {
   }
 }
 
-resource "aws_iam_policy" "govuk_mirror_read_policy" {
-  name        = "govuk-${var.aws_environment}-mirror-read-policy"
-  policy      = "${data.template_file.s3_govuk_mirror_read_policy_template.rendered}"
-  description = "Allow the listing and reading of the primary govuk mirror bucket"
-}
-
-resource "aws_iam_user" "govuk_mirror_google_reader" {
-  name = "govuk_mirror_google_reader"
-}
-
-resource "aws_iam_policy_attachment" "govuk_mirror_read_policy_attachment" {
-  name       = "s3-govuk-mirror-read-policy-attachment"
-  users      = ["${aws_iam_user.govuk_mirror_google_reader.name}"]
-  policy_arn = "${aws_iam_policy.govuk_mirror_read_policy.arn}"
-}
-
 #
 # CloudFront
 #
