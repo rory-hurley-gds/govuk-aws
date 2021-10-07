@@ -72,6 +72,7 @@ resource "aws_acm_certificate" "certificate_external" {
   domain_name               = "${var.certificate_external_domain_name}"
   subject_alternative_names = ["${var.certificate_external_subject_alternative_names}"]
   validation_method         = "DNS"
+  provider                  = aws.aws_cloudfront_certificate
 }
 
 resource "aws_route53_record" "certificate_external_validation" {
@@ -87,12 +88,14 @@ resource "aws_route53_record" "certificate_external_validation" {
 resource "aws_acm_certificate_validation" "certificate_external" {
   certificate_arn         = "${aws_acm_certificate.certificate_external.arn}"
   validation_record_fqdns = ["${aws_route53_record.certificate_external_validation.*.fqdn}"]
+  provider                = aws.aws_cloudfront_certificate
 }
 
 resource "aws_acm_certificate" "certificate_internal" {
   domain_name               = "${var.certificate_internal_domain_name}"
   subject_alternative_names = ["${var.certificate_internal_subject_alternative_names}"]
   validation_method         = "DNS"
+  provider                  = aws.aws_cloudfront_certificate
 }
 
 resource "aws_route53_record" "certificate_internal_validation" {
@@ -108,6 +111,7 @@ resource "aws_route53_record" "certificate_internal_validation" {
 resource "aws_acm_certificate_validation" "certificate_internal" {
   certificate_arn         = "${aws_acm_certificate.certificate_internal.arn}"
   validation_record_fqdns = ["${aws_route53_record.certificate_internal_validation.*.fqdn}"]
+  provider                = aws.aws_cloudfront_certificate
 }
 
 # Outputs
